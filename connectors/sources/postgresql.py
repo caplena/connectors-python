@@ -436,9 +436,6 @@ class PostgreSQLDataSource(BaseDataSource):
                                 "schema": schema,
                             }
                         )
-                        self._logger.debug(
-                            f"PostgreSQLDataSource.fetch_documents: table: {table}; serialize a row value; type(row): {type(row)}"
-                        )
                         yield self.serialize(doc=row)
                 else:
                     self._logger.warning(
