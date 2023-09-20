@@ -114,7 +114,13 @@ class PostgreSQLClient:
         """
         try:
             async with self.engine.connect() as connection:  # pyright: ignore
+                self._logger.info(
+                    f"PostgreSQLClient.get_cursor; connection.execute; query: {query}"
+                )
                 cursor = await connection.execute(text(query))
+                self._logger.info(
+                    f"PostgreSQLClient.get_cursor; cursor: {cursor}"
+                )
                 return cursor
         except Exception as exception:
             self._logger.warning(
@@ -374,8 +380,14 @@ class PostgreSQLDataSource(BaseDataSource):
             Dict: Document to be indexed
         """
         try:
+            self._logger.info(
+                f"PostgreSQLDataSource.fetch_documents: table: {table}; getting row count"
+            )
             row_count = await self.postgresql_client.get_table_row_count(
                 schema=schema, table=table
+            )
+            self._logger.info(
+                f"PostgreSQLDataSource.fetch_documents: table: {table}; row count: {row_count}"
             )
             if row_count > 0:
                 # Query to get the table's primary key
@@ -384,6 +396,9 @@ class PostgreSQLDataSource(BaseDataSource):
                 )
                 keys = map_column_names(
                     column_names=keys, schema=schema, tables=[table]
+                )
+                self._logger.info(
+                    f"PostgreSQLDataSource.fetch_documents: table: {table}; keys: {keys}"
                 )
                 if keys:
                     try:
@@ -397,6 +412,9 @@ class PostgreSQLDataSource(BaseDataSource):
                             f"Unable to fetch last_updated_time for {table}"
                         )
                         last_update_time = None
+                    self._logger.info(
+                        f"PostgreSQLDataSource.fetch_documents: table: {table}; last_update_time: {last_update_time}"
+                    )
                     streamer = self.postgresql_client.data_streamer(
                         schema=schema, table=table
                     )
@@ -417,6 +435,9 @@ class PostgreSQLDataSource(BaseDataSource):
                                 "Table": table,
                                 "schema": schema,
                             }
+                        )
+                        self._logger.debug(
+                            f"PostgreSQLDataSource.fetch_documents: table: {table}; serialize a row value; type(row): {type(row)}"
                         )
                         yield self.serialize(doc=row)
                 else:
