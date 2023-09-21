@@ -117,7 +117,7 @@ class PostgreSQLClient:
                 self._logger.info(
                     f"PostgreSQLClient.get_cursor; connection.execute; query: {query}"
                 )
-                cursor = await connection.execute(text(query))
+                cursor = await connection.stream(text(query))
                 self._logger.info(
                     f"PostgreSQLClient.get_cursor; cursor: {cursor}"
                 )
