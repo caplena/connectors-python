@@ -90,11 +90,10 @@ async def fetch(
         cursor = await cursor_func()
         # sending back column names if required
         if fetch_columns:
-            keys = await cursor.keys()
-            yield keys
+            yield cursor.keys()
 
         while True:
-            rows = await cursor.fetchmany(size=fetch_size)  # pyright: ignore
+            rows = cursor.fetchmany(size=fetch_size)  # pyright: ignore
             rows_length = len(rows)
 
             if not rows_length:
