@@ -4,6 +4,7 @@
 # you may not use this file except in compliance with the Elastic License 2.0.
 #
 """Postgresql source module is responsible to fetch documents from PostgreSQL."""
+import asyncio
 import ssl
 from functools import cached_property, partial
 from urllib.parse import quote
@@ -114,7 +115,13 @@ class PostgreSQLClient:
         """
         try:
             async with self.engine.connect() as connection:  # pyright: ignore
+                self._logger.info(
+                    f"PostgreSQLClient.get_cursor; connection.execute; query: {query}"
+                )
                 cursor = await connection.execute(text(query))
+                self._logger.info(
+                    f"PostgreSQLClient.get_cursor; cursor: {cursor}"
+                )
                 return cursor
         except Exception as exception:
             self._logger.warning(
@@ -221,19 +228,52 @@ class PostgreSQLClient:
         Yields:
             list: It will first yield the column names, then data in each row
         """
-        async for data in fetch(
-            cursor_func=partial(
-                self.get_cursor,
-                self.queries.table_data(
-                    schema=schema,
-                    table=table,
-                ),
-            ),
-            fetch_columns=True,
-            fetch_size=self.fetch_size,
-            retry_count=self.retry_count,
-        ):
-            yield data
+        try:
+            async with self.engine.connect() as connection:  # pyright: ignore
+                query = self.queries.table_data(schema=schema, table=table)
+                self._logger.info(
+                    f"PostgreSQLClient.data_streamer; connection.stream; query: {query}"
+                )
+                async with connection.stream(text(query)) as batch:
+                    self._logger.info(
+                        f"PostgreSQLClient.data_streamer; got batch; type(batch): {type(batch)}"
+                    )
+                    keys = batch.keys()
+                    self._logger.info(
+                        f"PostgreSQLClient.data_streamer; yielding keys; keys: {keys}"
+                    )
+                    yield keys
+                    async for rows in batch.partitions(size=self.fetch_size):
+                        for row in rows:
+                            yield row
+                        await asyncio.sleep(0)
+                    # while True:
+                    #     batch_size = 0
+                    #     async for row in batch.fetchmany(size=self.fetch_size):
+                    #         batch_size += 1
+                    #         yield row
+                    #     if batch_size < self.fetch_size:
+                    #         break
+                    #     await asyncio.sleep(0)
+        except Exception as exception:
+            self._logger.warning(
+                f"PostgreSQLClient.data_streamer; Something went wrong while getting cursor. Exception: {exception}"
+            )
+            raise
+
+        # async for data in fetch(
+        #     cursor_func=partial(
+        #         self.get_cursor,
+        #         self.queries.table_data(
+        #             schema=schema,
+        #             table=table,
+        #         ),
+        #     ),
+        #     fetch_columns=True,
+        #     fetch_size=self.fetch_size,
+        #     retry_count=self.retry_count,
+        # ):
+        #     yield data
 
     def _get_connect_args(self):
         """Convert string to pem format and create an SSL context
@@ -374,8 +414,14 @@ class PostgreSQLDataSource(BaseDataSource):
             Dict: Document to be indexed
         """
         try:
+            self._logger.info(
+                f"PostgreSQLDataSource.fetch_documents: table: {table}; getting row count"
+            )
             row_count = await self.postgresql_client.get_table_row_count(
                 schema=schema, table=table
+            )
+            self._logger.info(
+                f"PostgreSQLDataSource.fetch_documents: table: {table}; row count: {row_count}"
             )
             if row_count > 0:
                 # Query to get the table's primary key
@@ -384,6 +430,9 @@ class PostgreSQLDataSource(BaseDataSource):
                 )
                 keys = map_column_names(
                     column_names=keys, schema=schema, tables=[table]
+                )
+                self._logger.info(
+                    f"PostgreSQLDataSource.fetch_documents: table: {table}; keys: {keys}"
                 )
                 if keys:
                     try:
@@ -397,6 +446,9 @@ class PostgreSQLDataSource(BaseDataSource):
                             f"Unable to fetch last_updated_time for {table}"
                         )
                         last_update_time = None
+                    self._logger.info(
+                        f"PostgreSQLDataSource.fetch_documents: table: {table}; last_update_time: {last_update_time}"
+                    )
                     streamer = self.postgresql_client.data_streamer(
                         schema=schema, table=table
                     )

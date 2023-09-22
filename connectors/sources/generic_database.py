@@ -13,7 +13,7 @@ from connectors.utils import RetryStrategy, retryable
 
 WILDCARD = "*"
 
-DEFAULT_FETCH_SIZE = 50
+DEFAULT_FETCH_SIZE = 50 * 100
 DEFAULT_RETRY_COUNT = 3
 DEFAULT_WAIT_MULTIPLIER = 2
 

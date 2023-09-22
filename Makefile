@@ -1,7 +1,7 @@
 .PHONY: test lint autoformat run ftest install release docker-build docker-run docker-push
 
-PYTHON=python3.10
-ARCH=$(shell uname -m)
+PYTHON=python
+ARCH=x86_64
 PERF8?=no
 SLOW_TEST_THRESHOLD=1 # seconds
 VERSION=$(shell cat connectors/VERSION)
@@ -14,13 +14,14 @@ bin/python:
 install: bin/python bin/elastic-ingest
 
 bin/elastic-ingest: bin/python
+	echo $(ARCH)
 	bin/pip install -r requirements/$(ARCH).txt
 	bin/python setup.py develop
 
 bin/black: bin/python
 	bin/pip install -r requirements/$(ARCH).txt
 	bin/pip install -r requirements/tests.txt
-	
+
 
 bin/pytest: bin/python
 	bin/pip install -r requirements/$(ARCH).txt
@@ -71,7 +72,7 @@ default-config: install
 	bin/elastic-ingest --action config --service-type $(SERVICE_TYPE)
 
 docker-build:
-	docker build -t docker.elastic.co/enterprise-search/elastic-connectors:$(VERSION)-SNAPSHOT .
+	docker build --platform linux/amd64 -t docker.elastic.co/enterprise-search/elastic-connectors:$(VERSION)-SNAPSHOT .
 
 docker-run:
 	docker run -v $(PWD):/config docker.elastic.co/enterprise-search/elastic-connectors:$(VERSION)-SNAPSHOT /app/bin/elastic-ingest -c /config/config.yml --log-level=DEBUG
