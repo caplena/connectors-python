@@ -653,9 +653,6 @@ class BaseDataSource:
         for key, value in doc.items():
             doc[key] = _serialize(value)
 
-        self._logger.debug(
-            f"PostgreSQLDataSource._serialize: len_doc: {len(doc)}"
-        )
         return doc
 
     def sync_cursor(self):

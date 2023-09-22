@@ -238,19 +238,23 @@ class PostgreSQLClient:
                     self._logger.info(
                         f"PostgreSQLClient.data_streamer; got batch; type(batch): {type(batch)}"
                     )
-                    keys = await batch.keys()
+                    keys = batch.keys()
                     self._logger.info(
                         f"PostgreSQLClient.data_streamer; yielding keys; keys: {keys}"
                     )
                     yield keys
-                    while True:
-                        batch_size = 0
-                        async for row in batch.fetchmany(size=self.fetch_size):
-                            batch_size += 1
+                    async for rows in batch.partitions(size=self.fetch_size):
+                        for row in rows:
                             yield row
-                        if batch_size < self.fetch_size:
-                            break
                         await asyncio.sleep(0)
+                    # while True:
+                    #     batch_size = 0
+                    #     async for row in batch.fetchmany(size=self.fetch_size):
+                    #         batch_size += 1
+                    #         yield row
+                    #     if batch_size < self.fetch_size:
+                    #         break
+                    #     await asyncio.sleep(0)
         except Exception as exception:
             self._logger.warning(
                 f"PostgreSQLClient.data_streamer; Something went wrong while getting cursor. Exception: {exception}"
